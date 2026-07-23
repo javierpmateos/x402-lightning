@@ -4,7 +4,7 @@ import { computeRequirementsHash } from "../src/canonical.js";
 import { verifyPayment } from "../src/verify.js";
 import { MemorySpentSet } from "../src/spentSet.js";
 import { LightningFacilitator } from "../src/facilitator.js";
-import { sarExtension, requirementsCommitmentExtension, CommitmentBatchAccumulator } from "../src/extensions/index.js";
+import { attestationExtension, requirementsCommitmentExtension, CommitmentBatchAccumulator } from "../src/extensions/index.js";
 import type { PaymentPayload, PaymentRequirements } from "../src/types.js";
 
 let passed = 0;
@@ -98,20 +98,20 @@ assert("rule 7: tampered requirements break description_hash binding", (await ve
 
 console.log("rule 8 (spent-set) + facilitator pipeline");
 const facilitator = new LightningFacilitator(new MemorySpentSet());
-facilitator.registerExtension(sarExtension(randomBytes(32)));
+facilitator.registerExtension(attestationExtension(randomBytes(32)));
 const batch = new CommitmentBatchAccumulator();
 facilitator.registerExtension(requirementsCommitmentExtension(batch));
 
 const settle1 = await facilitator.settle(payload, req);
 assert("settle succeeds with payment hash as transaction id", settle1.success && settle1.transaction === paymentHash);
-assert("SAR extension attached on success", !!settle1.extensions["facilitator-attestation"]);
+assert("attestation extension attached on success", !!settle1.extensions["facilitator-attestation"]);
 assert("requirements-commitment receipt carries commitment + payment hash",
   (settle1.extensions["x402-requirements-commitment"] as any)?.commitment === requirementsHash &&
   (settle1.extensions["x402-requirements-commitment"] as any)?.paymentHash === paymentHash);
 
 const settle2 = await facilitator.settle(payload, req);
 assert("rule 8: replay rejected on second settle", !settle2.success && settle2.errorReason === "proof already redeemed");
-assert("extensions skip failed settlement (SAR guard)", settle2.extensions["facilitator-attestation"] === undefined);
+assert("extensions skip failed settlement (attestation guard)", settle2.extensions["facilitator-attestation"] === undefined);
 
 assert("commitment batch produces a Merkle root", batch.root().length === 64);
 

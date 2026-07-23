@@ -17,7 +17,7 @@ export class LightningFacilitator {
   }
 
   async verify(payload: PaymentPayload, req: PaymentRequirements) {
-    // /verify runs checks 1-6 only; redemption (check 7) happens at /settle.
+    // /verify runs rules 1-7 only; redemption (rule 8) happens at /settle.
     return verifyPayment(payload, req, null);
   }
 

@@ -1,12 +1,21 @@
 import { createHash, createHmac } from "node:crypto";
+import canonicalize from "canonicalize";
 import type { FacilitatorExtension, SettleContext } from "../types.js";
 
 /**
- * Settlement Attestation Receipt (SAR) — facilitator-signed attestation that a
- * given payment hash was verified as settled. Placeholder signer: HMAC over the
- * canonical claim; swap for EIP-712 or BIP-340 per the SAR spec profile.
+ * Facilitator attestation placeholder — signs a claim that a given payment
+ * hash was verified as settled. The claim is canonicalized (RFC 8785) and
+ * signed with an HMAC purely to demonstrate the hook.
+ *
+ * NOTE: this is NOT a Settlement Attestation Receipt implementation. A real
+ * SAR profile (x402-foundation/x402#1195) specifies Ed25519 signatures over
+ * the JCS-canonical form with that spec's defined field set (receipt_version,
+ * receipt_id, verdict, verifier_kid, sig_alg, ...). Emitting that form is
+ * future work; the key here (`facilitator-attestation`) matches the example
+ * in the facilitator extension hook PR (#2339) and does not claim the SAR
+ * namespace.
  */
-export function sarExtension(signingKey: Buffer): FacilitatorExtension {
+export function attestationExtension(signingKey: Buffer): FacilitatorExtension {
   return {
     key: "facilitator-attestation",
     async enrichSettleResponse(ctx: SettleContext) {
@@ -18,8 +27,10 @@ export function sarExtension(signingKey: Buffer): FacilitatorExtension {
         resource: ctx.paymentPayload.resource?.url ?? null,
         attestedAt: Math.floor(Date.now() / 1000),
       };
-      const signature = createHmac("sha256", signingKey).update(JSON.stringify(claim)).digest("hex");
-      return { claim, signature, alg: "hmac-sha256-placeholder" };
+      const payload = canonicalize(claim);
+      if (!payload) return undefined;
+      const signature = createHmac("sha256", signingKey).update(payload).digest("hex");
+      return { claim, signature, alg: "hmac-sha256-placeholder", canonicalization: "RFC8785" };
     },
   };
 }

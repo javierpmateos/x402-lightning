@@ -12,7 +12,7 @@ export interface CreatedInvoice {
 
 /**
  * Backend abstraction so LND, CLN, or an Ark-style wallet API are
- * interchangeable (Mode B invoice issuance). Verification never requires a
+ * interchangeable for invoice issuance. Verification never requires a
  * backend; `lookupSettled` is optional defense-in-depth only.
  */
 export interface LightningBackend {
