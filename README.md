@@ -32,8 +32,9 @@ extension pipeline, not implementations of published extension specs:
 
 - `facilitator-attestation` signs a settlement claim with an HMAC placeholder.
   A real Settlement Attestation Receipt profile (x402-foundation/x402#1195)
-  would emit that spec's canonical Ed25519 + JCS form with its defined field
-  set — this is a hook demonstration, not a SAR implementation.
+  would emit that spec's canonical Ed25519 + JCS form, with its defined field
+  set and verifier key discovery via `.well-known/sar-keys.json` — this is a
+  hook demonstration, not a SAR implementation.
 - `x402-requirements-commitment` relays the x402 payment-terms commitment
   bound into the invoice. It is not a Verifiable Invoice Commitment envelope:
   a VIC profile per ERC-8342 would carry the EIP-712 `invoiceHash` of a signed

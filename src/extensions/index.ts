@@ -9,11 +9,12 @@ import type { FacilitatorExtension, SettleContext } from "../types.js";
  *
  * NOTE: this is NOT a Settlement Attestation Receipt implementation. A real
  * SAR profile (x402-foundation/x402#1195) specifies Ed25519 signatures over
- * the JCS-canonical form with that spec's defined field set (receipt_version,
- * receipt_id, verdict, verifier_kid, sig_alg, ...). Emitting that form is
- * future work; the key here (`facilitator-attestation`) matches the example
- * in the facilitator extension hook PR (#2339) and does not claim the SAR
- * namespace.
+ * the JCS-canonical form, with that spec's defined field set (receipt_version,
+ * receipt_id = SHA256(JCS(core_fields)), verdict, verifier_kid, sig_alg, ...)
+ * and verifier key discovery via `.well-known/sar-keys.json`. Emitting that
+ * form is future work; the key here (`facilitator-attestation`) matches the
+ * example in the facilitator extension hook PR (#2339) and does not claim the
+ * SAR namespace.
  */
 export function attestationExtension(signingKey: Buffer): FacilitatorExtension {
   return {
