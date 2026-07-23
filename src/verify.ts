@@ -19,7 +19,7 @@ export interface VerifyOptions {
 }
 
 /**
- * Implements Facilitator Verification Rules 1-8 of scheme_exact_lightning.
+ * Implements Facilitator Verification Rules 1-8 of scheme_upfront_lightning.
  * Rules 1-7 are pure functions of the inputs; rule 8 consults the spent-set.
  * Pass spentSet=null to run rules 1-7 only (/verify); /settle runs all eight.
  */
@@ -37,14 +37,14 @@ export async function verifyPayment(
   if (payload.x402Version !== 2) {
     return { isValid: false, failedRule: 1, invalidReason: "unsupported x402Version" };
   }
-  if (!acc || acc.scheme !== "exact" || req.scheme !== "exact") {
-    return { isValid: false, failedRule: 1, invalidReason: "scheme must be exact" };
+  if (!acc || acc.scheme !== "upfront" || req.scheme !== "upfront") {
+    return { isValid: false, failedRule: 1, invalidReason: "scheme must be upfront" };
   }
   const topMatch =
     acc.network === req.network && acc.asset === req.asset && acc.payTo === req.payTo &&
     acc.amount === req.amount && acc.maxTimeoutSeconds === req.maxTimeoutSeconds;
   const extraMatch =
-    acc.extra?.paymentMethod === "lightning" && req.extra.paymentMethod === "lightning" &&
+    acc.extra?.assetTransferMethod === "bolt11" && req.extra.assetTransferMethod === "bolt11" &&
     acc.extra?.denomination === req.extra.denomination &&
     acc.extra?.invoice === req.extra.invoice &&
     acc.extra?.paymentHash === req.extra.paymentHash;
@@ -89,6 +89,9 @@ export async function verifyPayment(
   const created = decoded.timestamp ?? 0;
   const expiry = Number(tag(decoded, "expire_time") ?? 3600);
   const expiresAt = created + expiry;
+  if (req.extra.invoiceExpiry !== expiresAt) {
+    return { isValid: false, failedRule: 6, invalidReason: "extra.invoiceExpiry does not match invoice timestamp + expiry" };
+  }
   if (now > expiresAt) {
     return { isValid: false, failedRule: 6, invalidReason: "invoice expired" };
   }
@@ -96,16 +99,21 @@ export async function verifyPayment(
     return { isValid: false, failedRule: 6, invalidReason: "proof presented after maxTimeoutSeconds" };
   }
 
-  // Rule 7: requirements binding via description_hash
-  if (req.extra.requirementsHash) {
-    const commit = String(tag(decoded, "purpose_commit_hash") ?? "").toLowerCase();
-    const expected = req.extra.requirementsHash.toLowerCase();
-    if (commit !== expected) {
-      return { isValid: false, failedRule: 7, invalidReason: "invoice description_hash does not match requirementsHash" };
+  // Rule 7: requirements binding via description_hash.
+  // Anchored to the SIGNED artifact: if the invoice carries purpose_commit_hash,
+  // it MUST recompute from the canonical requirements regardless of whether the
+  // mutable extra.requirementsHash field is present (stripping that field cannot
+  // disable the check). If extra.requirementsHash is present it MUST match too.
+  const commit = String(tag(decoded, "purpose_commit_hash") ?? "").toLowerCase();
+  if (commit) {
+    if (computeRequirementsHash(req) !== commit) {
+      return { isValid: false, failedRule: 7, invalidReason: "invoice description_hash does not recompute from canonical requirements" };
     }
-    if (computeRequirementsHash(req) !== expected) {
-      return { isValid: false, failedRule: 7, invalidReason: "requirementsHash does not recompute from canonical requirements" };
+    if (req.extra.requirementsHash && req.extra.requirementsHash.toLowerCase() !== commit) {
+      return { isValid: false, failedRule: 7, invalidReason: "requirementsHash does not match invoice description_hash" };
     }
+  } else if (req.extra.requirementsHash) {
+    return { isValid: false, failedRule: 7, invalidReason: "requirementsHash present but invoice carries no description_hash" };
   }
 
   // Rule 8: single use

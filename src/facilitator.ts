@@ -49,7 +49,7 @@ export class LightningFacilitator {
         httpRes.end(JSON.stringify(body));
       };
       if (httpReq.method === "GET" && httpReq.url === "/supported") {
-        return send(200, { kinds: [{ scheme: "lightning", network: "bitcoin" }, { scheme: "lightning", network: "bitcoin-signet" }] });
+        return send(200, { kinds: [{ scheme: "upfront", network: "bip122:000000000019d6689c085ae165831e93" }, { scheme: "upfront", network: "bip122:00000008819873e925422c1ff0f99f7c" }] });
       }
       if (httpReq.method !== "POST" || !["/verify", "/settle"].includes(httpReq.url ?? "")) {
         return send(404, { error: "not found" });

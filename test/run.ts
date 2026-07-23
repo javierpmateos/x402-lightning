@@ -4,7 +4,7 @@ import { computeRequirementsHash } from "../src/canonical.js";
 import { verifyPayment } from "../src/verify.js";
 import { MemorySpentSet } from "../src/spentSet.js";
 import { LightningFacilitator } from "../src/facilitator.js";
-import { sarExtension, vicExtension, VicBatchAccumulator } from "../src/extensions/index.js";
+import { sarExtension, requirementsCommitmentExtension, CommitmentBatchAccumulator } from "../src/extensions/index.js";
 import type { PaymentPayload, PaymentRequirements } from "../src/types.js";
 
 let passed = 0;
@@ -22,14 +22,14 @@ const now = Math.floor(Date.now() / 1000);
 const tbNetwork = { bech32: "tb", pubKeyHash: 111, scriptHash: 196, validWitnessVersions: [0, 1] };
 
 const req: PaymentRequirements = {
-  scheme: "exact",
+  scheme: "upfront",
   network: MAINNET,
   amount: "1500",
   asset: "BTC",
   payTo: "",
   maxTimeoutSeconds: 3600,
   extra: {
-    paymentMethod: "lightning",
+    assetTransferMethod: "bolt11",
     denomination: "msat",
     invoice: "",
     paymentHash,
@@ -99,20 +99,34 @@ assert("rule 7: tampered requirements break description_hash binding", (await ve
 console.log("rule 8 (spent-set) + facilitator pipeline");
 const facilitator = new LightningFacilitator(new MemorySpentSet());
 facilitator.registerExtension(sarExtension(randomBytes(32)));
-const batch = new VicBatchAccumulator();
-facilitator.registerExtension(vicExtension(batch));
+const batch = new CommitmentBatchAccumulator();
+facilitator.registerExtension(requirementsCommitmentExtension(batch));
 
 const settle1 = await facilitator.settle(payload, req);
 assert("settle succeeds with payment hash as transaction id", settle1.success && settle1.transaction === paymentHash);
 assert("SAR extension attached on success", !!settle1.extensions["facilitator-attestation"]);
-assert("VIC envelope carries commitment + lightning paymentRef",
-  (settle1.extensions["vic"] as any)?._ext?.invoice?.commitment === requirementsHash);
+assert("requirements-commitment receipt carries commitment + payment hash",
+  (settle1.extensions["x402-requirements-commitment"] as any)?.commitment === requirementsHash &&
+  (settle1.extensions["x402-requirements-commitment"] as any)?.paymentHash === paymentHash);
 
 const settle2 = await facilitator.settle(payload, req);
 assert("rule 8: replay rejected on second settle", !settle2.success && settle2.errorReason === "proof already redeemed");
 assert("extensions skip failed settlement (SAR guard)", settle2.extensions["facilitator-attestation"] === undefined);
 
-assert("VIC batch produces a Merkle root", batch.root().length === 64);
+assert("commitment batch produces a Merkle root", batch.root().length === 64);
+
+// Fix regressions: rule 7 hardening + invoiceExpiry validation
+const strippedBinding = { ...req, extra: { ...req.extra } } as PaymentRequirements;
+delete (strippedBinding.extra as any).requirementsHash;
+assert("rule 7: stripping requirementsHash alone still verifies (binding runs against signed invoice)",
+  (await verifyPayment(mkPayload({}, strippedBinding), strippedBinding, null)).isValid);
+
+const stripAndTamper = { ...strippedBinding, maxTimeoutSeconds: 7200, extra: { ...strippedBinding.extra } } as PaymentRequirements;
+assert("rule 7: stripping requirementsHash cannot disable detection of tampered terms",
+  (await verifyPayment(mkPayload({}, stripAndTamper), stripAndTamper, null)).failedRule === 7);
+
+const badExpiry = { ...req, extra: { ...req.extra, invoiceExpiry: req.extra.invoiceExpiry + 999 } } as PaymentRequirements;
+assert("rule 6: extra.invoiceExpiry must match the signed invoice", (await verifyPayment(mkPayload({}, badExpiry), badExpiry, null)).failedRule === 6);
 
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);

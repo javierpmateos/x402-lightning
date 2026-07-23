@@ -11,7 +11,7 @@ export interface FiatQuote {
 }
 
 export interface LightningRequirementsExtra {
-  paymentMethod: "lightning";
+  assetTransferMethod: "bolt11";
   denomination: "msat" | "sat";
   invoice: string;
   paymentHash: string;
@@ -22,7 +22,7 @@ export interface LightningRequirementsExtra {
 }
 
 export interface PaymentRequirements {
-  scheme: "exact";
+  scheme: "upfront";
   network: Network;
   amount: string;
   asset: "BTC";
