@@ -43,11 +43,17 @@ export async function verifyPayment(
   const topMatch =
     acc.network === req.network && acc.asset === req.asset && acc.payTo === req.payTo &&
     acc.amount === req.amount && acc.maxTimeoutSeconds === req.maxTimeoutSeconds;
+  // The echo comparison exists so a client cannot select an offer different
+  // from the one served; it is NOT the security boundary for the values it
+  // covers. Rules 6-7 validate against `req` (the authoritative
+  // paymentRequirements), never against the client echo.
   const extraMatch =
     acc.extra?.assetTransferMethod === "bolt11" && req.extra.assetTransferMethod === "bolt11" &&
     acc.extra?.denomination === req.extra.denomination &&
     acc.extra?.invoice === req.extra.invoice &&
-    acc.extra?.paymentHash === req.extra.paymentHash;
+    acc.extra?.paymentHash === req.extra.paymentHash &&
+    acc.extra?.invoiceExpiry === req.extra.invoiceExpiry &&
+    acc.extra?.requirementsHash === req.extra.requirementsHash;
   if (!topMatch || !extraMatch) {
     return { isValid: false, failedRule: 1, invalidReason: "accepted does not match paymentRequirements" };
   }

@@ -194,7 +194,7 @@ canonical payload inside the requirements object before hashing.
 `resource` is OPTIONAL in the base v2 `PaymentPayload` but REQUIRED in this
 profile: it is covered by the requirements binding and verified in Rule 7.
 
-The preimage is a portable payment proof: any party can verify it, in
+The preimage is a self-verifying payment proof: any party can verify it, in
 contrast with invoice-in-payload patterns whose verification requires
 querying the recipient's own wallet.
 
@@ -209,7 +209,13 @@ Reject if `paymentPayload.x402Version != 2`; if
 unsupported; or if `accepted` does not match `paymentRequirements` on
 `scheme`, `network`, `asset`, `payTo`, `amount`, `maxTimeoutSeconds`, or the
 required `extra` keys (`assetTransferMethod`, `denomination`, `invoice`,
-`paymentHash`).
+`paymentHash`, `invoiceExpiry`, `requirementsHash`).
+
+This comparison exists so that a client cannot select an offer different from
+the one it was served; it is not the security boundary for the values it
+covers. Rules 6 and 7 validate `invoiceExpiry` and `requirementsHash` against
+the authoritative `paymentRequirements` supplied by the resource server, never
+against the client echo.
 
 ### 2. Preimage Validity
 
@@ -329,7 +335,7 @@ spent-set MUST be shared across facilitator instances serving the same routes.
 ### Requirements Substitution
 
 Without the `description_hash` binding, an intermediary could pair a cheap
-invoice with expensive requirements. Issuers SHOULD always bind; clients
+invoice with expensive requirements. Issuers MUST bind (Rule 7); clients
 SHOULD verify the binding before paying. Verifiers anchor the check to the
 invoice signed `description_hash` (Rule 7), so removing the unsigned
 `extra.requirementsHash` field cannot neutralize a binding the recipient

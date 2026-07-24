@@ -81,6 +81,12 @@ assert("rule 1: wrong x402Version rejected", (await verifyPayment(wrongVersion, 
 const tamperedAccepted = mkPayload({}, { ...req, amount: "9999" });
 assert("rule 1: accepted mismatching requirements rejected", (await verifyPayment(tamperedAccepted, req, null)).failedRule === 1);
 
+const echoedExpiry = mkPayload({}, { ...req, extra: { ...req.extra, invoiceExpiry: req.extra.invoiceExpiry + 60 } });
+assert("rule 1: echo comparison covers invoiceExpiry", (await verifyPayment(echoedExpiry, req, null)).failedRule === 1);
+
+const echoedCommit = mkPayload({}, { ...req, extra: { ...req.extra, requirementsHash: "00".repeat(32) } });
+assert("rule 1: echo comparison covers requirementsHash", (await verifyPayment(echoedCommit, req, null)).failedRule === 1);
+
 assert("rule 2: wrong preimage rejected", (await verifyPayment(mkPayload({ preimage: randomBytes(32).toString("hex") }), req, null)).failedRule === 2);
 
 const otherPre = randomBytes(32);
