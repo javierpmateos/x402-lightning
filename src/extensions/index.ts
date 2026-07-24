@@ -3,9 +3,17 @@ import canonicalize from "canonicalize";
 import type { FacilitatorExtension, SettleContext } from "../types.js";
 
 /**
- * Facilitator attestation placeholder — signs a claim that a given payment
- * hash was verified as settled. The claim is canonicalized (RFC 8785) and
- * signed with an HMAC purely to demonstrate the hook.
+ * Lightning settlement claim (draft) — a facilitator-signed statement that a
+ * given payment hash was verified and consumed, carrying payment hash, amount,
+ * payee, requirements commitment, observation time and redemption result. The
+ * claim is canonicalized (RFC 8785) and signed with an HMAC placeholder purely
+ * to demonstrate the hook.
+ *
+ * Scope of the underlying proof: a preimage proves knowledge of the secret for
+ * a payee-signed invoice. It does not prove payer identity, settlement time, or
+ * delivery. Amount, payee and resource are attested because Rule 7 verified
+ * them against the recipient-signed binding — not because the preimage implies
+ * them.
  *
  * NOTE: this is NOT a Settlement Attestation Receipt implementation. A real
  * SAR profile (x402-foundation/x402#1195) specifies Ed25519 signatures over
@@ -21,12 +29,23 @@ export function attestationExtension(signingKey: Buffer): FacilitatorExtension {
     key: "facilitator-attestation",
     async enrichSettleResponse(ctx: SettleContext) {
       if (!ctx.result.success) return undefined;
+      // Every attested field is authenticated: amount, payee, network and the
+      // requirements commitment come from the recipient-signed invoice binding
+      // verified in Rule 7; `resource` is covered by that same commitment.
+      // `observedAt` is the facilitator's observation time, NOT a
+      // Lightning-native settlement timestamp — Lightning does not provide one.
       const claim = {
+        claimVersion: "0.1-draft",
         scheme: "upfront",
         network: ctx.requirements.network,
         paymentHash: ctx.paymentPayload.payload.paymentHash,
-        resource: ctx.paymentPayload.resource?.url ?? null,
-        attestedAt: Math.floor(Date.now() / 1000),
+        amount: ctx.requirements.amount,
+        denomination: ctx.requirements.extra.denomination,
+        payee: ctx.requirements.payTo,
+        requirementsCommitment: ctx.requirements.extra.requirementsHash,
+        resource: ctx.paymentPayload.resource.url,
+        observedAt: Math.floor(Date.now() / 1000),
+        redemption: "verified-and-consumed",
       };
       const payload = canonicalize(claim);
       if (!payload) return undefined;

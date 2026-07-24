@@ -16,7 +16,8 @@ export interface LightningRequirementsExtra {
   invoice: string;
   paymentHash: string;
   invoiceExpiry: number;
-  requirementsHash?: string;
+  /** REQUIRED in this profile: the binding is mandatory (see Rule 7). */
+  requirementsHash: string;
   fiatQuote?: FiatQuote;
   [key: string]: unknown;
 }
@@ -44,7 +45,8 @@ export interface LightningPayload {
 
 export interface PaymentPayload {
   x402Version: number;
-  resource?: ResourceInfo;
+  /** REQUIRED in this profile: covered by the requirements binding (Rule 7). */
+  resource: ResourceInfo;
   accepted: PaymentRequirements;
   payload: LightningPayload;
   extensions?: Record<string, unknown>;

@@ -34,6 +34,7 @@ const req: PaymentRequirements = {
     invoice: "",
     paymentHash,
     invoiceExpiry: now + 3600,
+    requirementsHash: "",
     fiatQuote: { amount: "0.001", currency: "USD", rate: "65743.69", rateTimestamp: now },
   },
 };
@@ -46,7 +47,8 @@ const probe = bolt11.sign(
 );
 req.payTo = bolt11.decode(probe.paymentRequest!).payeeNodeKey!;
 
-const requirementsHash = computeRequirementsHash(req);
+const RESOURCE = { url: "https://api.example.com/v1/quote", description: "Per-request access to /v1/quote", mimeType: "application/json" };
+const requirementsHash = computeRequirementsHash(req, RESOURCE);
 req.extra.requirementsHash = requirementsHash;
 
 const signed = bolt11.sign(
@@ -63,7 +65,7 @@ req.extra.invoice = signed.paymentRequest!;
 function mkPayload(over: Partial<PaymentPayload["payload"]> = {}, accepted: PaymentRequirements = req): PaymentPayload {
   return {
     x402Version: 2,
-    resource: { url: "https://api.example.com/v1/quote", mimeType: "application/json" },
+    resource: RESOURCE,
     accepted,
     payload: { paymentHash, preimage: preimage.toString("hex"), ...over },
   };
@@ -104,7 +106,13 @@ facilitator.registerExtension(requirementsCommitmentExtension(batch));
 
 const settle1 = await facilitator.settle(payload, req);
 assert("settle succeeds with payment hash as transaction id", settle1.success && settle1.transaction === paymentHash);
-assert("attestation extension attached on success", !!settle1.extensions["facilitator-attestation"]);
+const att = settle1.extensions["facilitator-attestation"] as any;
+assert("attestation extension attached on success", !!att);
+assert("claim carries authenticated amount, payee and requirements commitment",
+  att?.claim?.amount === req.amount && att?.claim?.payee === req.payTo &&
+  att?.claim?.requirementsCommitment === requirementsHash);
+assert("claim uses observedAt (facilitator observation), not a settlement timestamp",
+  typeof att?.claim?.observedAt === "number" && att?.claim?.attestedAt === undefined);
 assert("requirements-commitment receipt carries commitment + payment hash",
   (settle1.extensions["x402-requirements-commitment"] as any)?.commitment === requirementsHash &&
   (settle1.extensions["x402-requirements-commitment"] as any)?.paymentHash === paymentHash);
@@ -118,12 +126,18 @@ assert("commitment batch produces a Merkle root", batch.root().length === 64);
 // Fix regressions: rule 7 hardening + invoiceExpiry validation
 const strippedBinding = { ...req, extra: { ...req.extra } } as PaymentRequirements;
 delete (strippedBinding.extra as any).requirementsHash;
-assert("rule 7: stripping requirementsHash alone still verifies (binding runs against signed invoice)",
-  (await verifyPayment(mkPayload({}, strippedBinding), strippedBinding, null)).isValid);
-
-const stripAndTamper = { ...strippedBinding, maxTimeoutSeconds: 7200, extra: { ...strippedBinding.extra } } as PaymentRequirements;
+const stripTampered = { ...strippedBinding, maxTimeoutSeconds: 7200, extra: { ...strippedBinding.extra } } as PaymentRequirements;
 assert("rule 7: stripping requirementsHash cannot disable detection of tampered terms",
-  (await verifyPayment(mkPayload({}, stripAndTamper), stripAndTamper, null)).failedRule === 7);
+  (await verifyPayment(mkPayload({}, stripTampered), stripTampered, null)).failedRule === 7);
+
+// nutstrut boundary 2: client-substituted resource must be caught by the binding
+const swappedResource: PaymentPayload = { ...mkPayload(), resource: { ...RESOURCE, url: "https://api.example.com/v1/expensive" } };
+assert("rule 7: substituted client resource rejected (resource is bound)",
+  (await verifyPayment(swappedResource, req, null)).failedRule === 7);
+
+const noResource = { ...mkPayload(), resource: undefined } as unknown as PaymentPayload;
+assert("rule 7: missing payload.resource rejected (mandatory in profile)",
+  (await verifyPayment(noResource, req, null)).failedRule === 7);
 
 const badExpiry = { ...req, extra: { ...req.extra, invoiceExpiry: req.extra.invoiceExpiry + 999 } } as PaymentRequirements;
 assert("rule 6: extra.invoiceExpiry must match the signed invoice", (await verifyPayment(mkPayload({}, badExpiry), badExpiry, null)).failedRule === 6);

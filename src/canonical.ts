@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import canonicalize from "canonicalize";
-import type { PaymentRequirements } from "./types.js";
+import type { PaymentRequirements, ResourceInfo } from "./types.js";
 
 export function sha256Hex(data: Buffer | string): string {
   const buf = typeof data === "string" ? Buffer.from(data, "utf8") : data;
@@ -8,13 +8,19 @@ export function sha256Hex(data: Buffer | string): string {
 }
 
 /**
- * requirementsHash = SHA-256( JCS(requirements \ {extra.invoice, extra.requirementsHash}) )
- * Per spec section "Requirements binding (description_hash)".
+ * requirementsHash = SHA-256( JCS({ resource, requirements }) )
+ *
+ * The commitment covers BOTH the ResourceInfo from the PaymentRequired
+ * envelope and the chosen PaymentRequirements entry (minus the invoice and
+ * the hash field itself). Covering `resource` is what makes it authenticated:
+ * it reaches the facilitator only through the client payload, so without this
+ * a facilitator would be attesting to an unverified client-supplied value.
+ * Because the invoice is signed by the recipient node key, this hash makes
+ * the resource, price, network and terms all recipient-committed.
  */
-export function computeRequirementsHash(req: PaymentRequirements): string {
+export function computeRequirementsHash(req: PaymentRequirements, resource: ResourceInfo): string {
   const { invoice: _i, requirementsHash: _r, ...extraRest } = req.extra;
-  const stripped = { ...req, extra: extraRest };
-  const canonical = canonicalize(stripped);
+  const canonical = canonicalize({ resource, requirements: { ...req, extra: extraRest } });
   if (!canonical) throw new Error("canonicalization failed");
   return sha256Hex(canonical);
 }

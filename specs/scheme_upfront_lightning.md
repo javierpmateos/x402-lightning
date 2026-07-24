@@ -133,26 +133,38 @@ method need no chain access at all.
 | `extra.invoice`              | Required | BOLT11 invoice                                                          |
 | `extra.paymentHash`          | Required | Invoice payment hash (convenience copy; MUST match decoded invoice)     |
 | `extra.invoiceExpiry`        | Required | Unix time after which the invoice is invalid; MUST equal invoice creation timestamp plus expiry (Rule 6) |
-| `extra.requirementsHash`     | Optional | Commitment binding invoice to requirements (RECOMMENDED, see below)     |
+| `extra.requirementsHash`     | Required | Commitment binding invoice to resource + requirements (see below)       |
 | `extra.fiatQuote`            | Optional | Informational fiat context; not verified unless upgraded by extension   |
 
 ### Requirements Binding (`description_hash`)
 
-To bind the invoice to the offered terms, the issuer SHOULD set the BOLT11 `h`
+The binding is MANDATORY in this profile. The issuer MUST set the BOLT11 `h`
 field (`description_hash`) to:
 
 ```
-description_hash = SHA-256( JCS(PaymentRequirements \ {extra.invoice, extra.requirementsHash}) )
+description_hash = SHA-256( JCS({
+  resource:     <ResourceInfo from the PaymentRequired envelope>,
+  requirements: <this PaymentRequirements entry, minus extra.invoice and extra.requirementsHash>
+}) )
 ```
 
-where `JCS` is RFC 8785 JSON Canonicalization, and publish the same value as
+where `JCS` is RFC 8785 JSON Canonicalization; the same value is published as
 `extra.requirementsHash`. Because BOLT11 invoices are signed by the recipient
 node key, the invoice becomes a recipient-signed commitment to the full
 payment terms — closing requirements-substitution attacks without any
-signature beyond what BOLT11 already carries. Extensions carrying richer
-invoice metadata (e.g. verifiable invoice commitments) participate by
-committing their canonical payload inside the requirements object before
-hashing.
+signature beyond what BOLT11 already carries.
+
+The commitment deliberately covers the `ResourceInfo` object as well as the
+requirements. In x402 v2 `resource` lives in the `PaymentRequired` envelope
+and is echoed by the client in `PaymentPayload`; a facilitator receives it
+only through the client path and has no independently authenticated view of
+it. Binding it here makes that client-supplied value verifiable against the
+recipient's signature, which is what allows a facilitator to attest to the
+resource at all. Verifiers recompute the hash using
+`paymentPayload.resource`; a substituted resource fails Rule 7.
+
+Extensions carrying richer invoice metadata participate by committing their
+canonical payload inside the requirements object before hashing.
 
 ## `PaymentPayload` for `upfront`
 
@@ -178,6 +190,9 @@ hashing.
 | ------------- | -------- | ------------------------------------------------------------ |
 | `preimage`    | Required | 32-byte hex payment preimage obtained upon settlement        |
 | `paymentHash` | Required | MUST equal `SHA-256(preimage)` and match the invoice         |
+
+`resource` is OPTIONAL in the base v2 `PaymentPayload` but REQUIRED in this
+profile: it is covered by the requirements binding and verified in Rule 7.
 
 The preimage is a portable payment proof: any party can verify it, in
 contrast with invoice-in-payload patterns whose verification requires
@@ -221,15 +236,15 @@ The invoice amount, compared in millisatoshis after decoding, MUST equal
 plus its expiry. The invoice MUST NOT be expired at verification time, and
 the proof MUST be presented within `maxTimeoutSeconds` of invoice creation.
 
-### 7. Requirements Binding
+### 7. Requirements Binding (mandatory)
 
-The binding is anchored to the signed artifact: if the decoded invoice
-carries a `description_hash`, it MUST recompute from the canonical
-requirements object per the binding rule above — regardless of whether
-`extra.requirementsHash` is present, so that stripping the mutable field
-cannot disable the check. If `extra.requirementsHash` is present, it MUST
-additionally equal the invoice `description_hash`; if it is present but the
-invoice carries no `description_hash`, verification MUST fail.
+The decoded invoice MUST carry a `description_hash`; an invoice without one
+MUST be rejected in this profile. `paymentPayload.resource` MUST be present.
+The `description_hash` MUST recompute from the canonical
+`{resource, requirements}` object per the binding rule above, and
+`extra.requirementsHash` MUST equal it. Anchoring the check to the signed
+artifact means that neither stripping the mutable `extra.requirementsHash`
+field nor substituting the client-echoed `resource` can go undetected.
 
 ### 8. Single Use
 
@@ -270,11 +285,33 @@ handler only after a successful `/settle`.
 | `network`     | string         | CAIP-2 network identifier (same value as in requirements)      |
 | `payer`       | string \| null | `null`; Lightning does not natively identify payers            |
 
-Facilitator-registered extensions MAY populate `extensions` (e.g. settlement
-attestations, verifiable invoice commitment envelopes) via the standard
-extension pipeline.
+Facilitator-registered extensions MAY populate `extensions` via the standard
+extension pipeline. Where a portable receipt is needed, the RECOMMENDED shape
+is composition rather than widening an existing receipt format: a separately
+signed Lightning settlement claim carrying payment hash, amount, payee,
+requirements commitment, facilitator observation time and redemption result,
+which other receipt formats reference by digest. A payment hash placed in an
+unsigned extension envelope is correlation context, not an attested
+settlement identifier, since it can be replaced without invalidating the
+outer signature.
+
+The preimage MUST NOT appear in any portable receipt or settlement response:
+it is a bearer proof, and publishing it creates replay and disclosure risk.
+Verifiers check it during settlement and attest the result; the settlement
+response carries the payment hash only.
 
 ## Security Considerations
+
+### Scope of the Settlement Proof
+
+A valid preimage proves knowledge of the secret for a payee-signed invoice,
+and therefore that the invoice was settled. It does **not** independently
+prove payer identity, settlement time, or delivery of the resource. Amount,
+payee, network and resource are established by the recipient-signed
+requirements binding (Rule 7) — not implied by the preimage. Any receipt or
+attestation built on this profile MUST reflect that separation, and any
+timestamp a facilitator emits is its own observation time: Lightning does not
+expose a native settlement timestamp to the verifier.
 
 ### Trust Minimization
 

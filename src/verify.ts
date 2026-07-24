@@ -99,21 +99,23 @@ export async function verifyPayment(
     return { isValid: false, failedRule: 6, invalidReason: "proof presented after maxTimeoutSeconds" };
   }
 
-  // Rule 7: requirements binding via description_hash.
-  // Anchored to the SIGNED artifact: if the invoice carries purpose_commit_hash,
-  // it MUST recompute from the canonical requirements regardless of whether the
-  // mutable extra.requirementsHash field is present (stripping that field cannot
-  // disable the check). If extra.requirementsHash is present it MUST match too.
+  // Rule 7: requirements binding via description_hash — MANDATORY in this profile.
+  // Anchored to the SIGNED artifact: the invoice's purpose_commit_hash MUST
+  // recompute from the canonical {resource, requirements} object, so neither
+  // stripping the mutable extra.requirementsHash nor substituting the
+  // client-supplied resource can go undetected.
   const commit = String(tag(decoded, "purpose_commit_hash") ?? "").toLowerCase();
-  if (commit) {
-    if (computeRequirementsHash(req) !== commit) {
-      return { isValid: false, failedRule: 7, invalidReason: "invoice description_hash does not recompute from canonical requirements" };
-    }
-    if (req.extra.requirementsHash && req.extra.requirementsHash.toLowerCase() !== commit) {
-      return { isValid: false, failedRule: 7, invalidReason: "requirementsHash does not match invoice description_hash" };
-    }
-  } else if (req.extra.requirementsHash) {
-    return { isValid: false, failedRule: 7, invalidReason: "requirementsHash present but invoice carries no description_hash" };
+  if (!commit) {
+    return { isValid: false, failedRule: 7, invalidReason: "invoice carries no description_hash; binding is mandatory in this profile" };
+  }
+  if (!payload.resource?.url) {
+    return { isValid: false, failedRule: 7, invalidReason: "payload.resource is required; it is covered by the binding" };
+  }
+  if (computeRequirementsHash(req, payload.resource) !== commit) {
+    return { isValid: false, failedRule: 7, invalidReason: "invoice description_hash does not recompute from canonical resource+requirements" };
+  }
+  if (req.extra.requirementsHash.toLowerCase() !== commit) {
+    return { isValid: false, failedRule: 7, invalidReason: "requirementsHash does not match invoice description_hash" };
   }
 
   // Rule 8: single use
