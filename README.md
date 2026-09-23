@@ -1,5 +1,11 @@
 # x402-lightning
 
+> **Note:** this is a reference implementation written during the design of the
+> Lightning scheme for x402. The spec has since been merged with a
+> transport-agnostic request binding (`requestBindingProfile` /
+> `requestBindingParams`) and the `lnbtc:` network identifier; this repo
+> predates both and is kept as-is.
+
 Reference facilitator for the x402 `upfront` scheme on Bitcoin Lightning,
 under the payment-proof (client-settled) asset transfer family: the client
 pays a BOLT11 invoice and presents the payment preimage as a self-verifying
