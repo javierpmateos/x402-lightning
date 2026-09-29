@@ -1,0 +1,44 @@
+{
+  "signing_key": {
+    "seed_hex": "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60",
+    "source": "RFC 8032 §7.1 TEST 1",
+    "public_key_x": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"
+  },
+  "key_registry": {
+    "keys": [
+      {
+        "kid": "lnbtc-settlement-ed25519-01",
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"
+      }
+    ]
+  },
+  "core": {
+    "claim_version": "lnbtc.settlement.v1",
+    "network": "lnbtc:000000000019d6689c085ae165831e93",
+    "payment_hash": "a923c2c0e4fe77061ff1cb882171f6fdf926719bb7f5ffe2e05458438c52825e",
+    "payment_request": "lnbc250n1pj48ugqpp54y3u9s8ylemsv8l3ewyzzu0klhujvuvmkl6llchq23vy8rzjsf0qsp5zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zygshp5p4nz8am4uqj4q8a87z3sk4x6yk4dv2mvel34epw68qqkwy0xcqvqxqzfvcqpjr4rx6ls6j5rpwknuea64evlk7yfx56wmqcer5eerekdsn9tlv6v4ex9mlz5dtm9qapl3svwlqcf7837dmjkru9z9w4h2rvm0md52w2sqxrwu5f",
+    "request_hash": "0d6623f775e025501fa7f0a30b54da25aad62b6ccfe35c85da38016711e6c018",
+    "request_binding_profile": "http:1",
+    "observed_at": "2023-11-14T22:13:25Z",
+    "redemption": "verified-and-consumed",
+    "attester_kid": "lnbtc-settlement-ed25519-01"
+  },
+  "canonical_core": "{\"attester_kid\":\"lnbtc-settlement-ed25519-01\",\"claim_version\":\"lnbtc.settlement.v1\",\"network\":\"lnbtc:000000000019d6689c085ae165831e93\",\"observed_at\":\"2023-11-14T22:13:25Z\",\"payment_hash\":\"a923c2c0e4fe77061ff1cb882171f6fdf926719bb7f5ffe2e05458438c52825e\",\"payment_request\":\"lnbc250n1pj48ugqpp54y3u9s8ylemsv8l3ewyzzu0klhujvuvmkl6llchq23vy8rzjsf0qsp5zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zygshp5p4nz8am4uqj4q8a87z3sk4x6yk4dv2mvel34epw68qqkwy0xcqvqxqzfvcqpjr4rx6ls6j5rpwknuea64evlk7yfx56wmqcer5eerekdsn9tlv6v4ex9mlz5dtm9qapl3svwlqcf7837dmjkru9z9w4h2rvm0md52w2sqxrwu5f\",\"redemption\":\"verified-and-consumed\",\"request_binding_profile\":\"http:1\",\"request_hash\":\"0d6623f775e025501fa7f0a30b54da25aad62b6ccfe35c85da38016711e6c018\"}",
+  "digest_hex": "955ceb45504f3bbc61a85c035b13cca79337204c2779700d76da139cb1a71918",
+  "claim": {
+    "claim_version": "lnbtc.settlement.v1",
+    "network": "lnbtc:000000000019d6689c085ae165831e93",
+    "payment_hash": "a923c2c0e4fe77061ff1cb882171f6fdf926719bb7f5ffe2e05458438c52825e",
+    "payment_request": "lnbc250n1pj48ugqpp54y3u9s8ylemsv8l3ewyzzu0klhujvuvmkl6llchq23vy8rzjsf0qsp5zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zygshp5p4nz8am4uqj4q8a87z3sk4x6yk4dv2mvel34epw68qqkwy0xcqvqxqzfvcqpjr4rx6ls6j5rpwknuea64evlk7yfx56wmqcer5eerekdsn9tlv6v4ex9mlz5dtm9qapl3svwlqcf7837dmjkru9z9w4h2rvm0md52w2sqxrwu5f",
+    "request_hash": "0d6623f775e025501fa7f0a30b54da25aad62b6ccfe35c85da38016711e6c018",
+    "request_binding_profile": "http:1",
+    "observed_at": "2023-11-14T22:13:25Z",
+    "redemption": "verified-and-consumed",
+    "attester_kid": "lnbtc-settlement-ed25519-01",
+    "claim_id": "sha256:955ceb45504f3bbc61a85c035b13cca79337204c2779700d76da139cb1a71918",
+    "sig_alg": "Ed25519",
+    "sig": "base64url:em1Q_uKEV8PfQRXbW_OWXwbQbBc5IzAKYGHNFy-93ixyjt5t2AfBRVxMcgl5wN7ZH5iFoMEhkNoSOfJr_WLsBg"
+  }
+}

@@ -8,7 +8,8 @@
   },
   "scripts": {
     "build": "tsc",
-    "test": "tsc && node dist/test/run.js"
+    "test": "tsc && node dist/test/run.js && node dist/test/settlementClaim.js",
+    "vector": "tsc && node dist/test/settlementClaim.js --vector"
   },
   "keywords": [],
   "author": "",
@@ -17,6 +18,7 @@
     "@types/node": "^26.1.1",
     "bolt11": "^1.4.1",
     "canonicalize": "^3.0.0",
+    "sar-envelope": "^0.1.0",
     "typescript": "^7.0.2"
   },
   "type": "module"
