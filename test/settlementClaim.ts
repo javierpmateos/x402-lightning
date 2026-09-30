@@ -76,6 +76,11 @@ assert("amount is read from the invoice, not the claim", good.ok && good.amountM
 assert("claim_id = sha256: + hex(SHA-256(JCS(core)))", claim.claim_id === claimId(core));
 assert("signed core has exactly nine fields", Object.keys(JSON.parse(Buffer.from(canonicalCoreBytes(core)).toString("utf8"))).length === 9);
 assert("verifies without an expected payee too", verifyClaim(claim, { registry }).ok);
+assert("payeeChecked is true when an expected payee was compared", good.ok && good.payeeChecked === true);
+assert("payeeChecked is false when no expected payee was supplied", (() => {
+  const r = verifyClaim(claim, { registry });
+  return r.ok && r.payeeChecked === false;
+})());
 
 // ---------------------------------------------------------------------------
 console.log("\ntampering with a signed claim");

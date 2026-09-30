@@ -151,7 +151,21 @@ export type ClaimCheck =
   | "payee";
 
 export type ClaimVerification =
-  | { ok: true; claimId: string; payee: string; amountMsat: string | null; invoiceCreatedAt: number }
+  | {
+      ok: true;
+      claimId: string;
+      /** Node key recovered from the invoice signature. */
+      payee: string;
+      /**
+       * true only when `expectedPayee` was supplied and matched. When false,
+       * the invoice was not attributed to the intended x402 payee: `ok` then
+       * means the claim is authentic and consistent with a well-formed
+       * invoice, not that the payment went to whom the caller intended.
+       */
+      payeeChecked: boolean;
+      amountMsat: string | null;
+      invoiceCreatedAt: number;
+    }
   | { ok: false; failed: ClaimCheck; reason: string };
 
 export interface VerifyOptions {
@@ -267,6 +281,7 @@ export function verifyClaim(claim: Record<string, unknown>, opts: VerifyOptions)
     ok: true,
     claimId: expectedId,
     payee,
+    payeeChecked: opts.expectedPayee !== undefined,
     amountMsat: decoded.millisatoshis ?? null,
     invoiceCreatedAt: createdAt,
   };
