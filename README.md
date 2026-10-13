@@ -12,6 +12,7 @@ pays a BOLT11 invoice and presents the payment preimage as a self-verifying
 proof of settlement.
 
 - Spec draft: `specs/scheme_upfront_lightning.md` (target: `specs/schemes/upfront/`, pending x402-foundation/x402#2520)
+- Settlement claim and attester endorsement (`lnbtc.settlement.v1`, v1 test profile from x402-foundation/x402#1195): `specs/lnbtc_settlement_claim_v1.md`, vectors in `test/vectors/`
 - Stateless verification: rules 1-7 are pure functions of the request; only replay protection (rule 8) holds state
 - Deterministic finality: the preimage *is* the settlement — no node query, no confirmation policy, no chain access
 - `description_hash` binding: the BOLT11 invoice is a recipient-signed commitment to the canonical (RFC 8785) payment requirements

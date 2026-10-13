@@ -7,6 +7,7 @@ import {
   coreDigest,
   ed25519KeyFromSeed,
   extractCore,
+  parseAttesterRegistry,
   parseKeyRegistry,
   registryEntry,
   signClaim,
@@ -176,7 +177,39 @@ assert("invoice without a description hash is rejected",
   failedAt(signedWith({ network: TESTNET, payment_request: noDescHash, payment_hash: "33".repeat(32) }), { registry }) === "request_hash");
 
 // ---------------------------------------------------------------------------
+// Expected conditions for authorizing an x402 operation
+
+console.log("\nexpected request and amount");
+const SPEC_AMOUNT_MSAT = "25000"; // lnbc250n = 250 nanobitcoin = 25 000 msat
+const full = verifyClaim(claim, {
+  ...opts,
+  expectedRequestHash: SPEC_REQUEST_HASH,
+  expectedAmountMsat: SPEC_AMOUNT_MSAT,
+});
+assert("claim verifies against the expected request and amount",
+  full.ok && full.requestChecked && full.amountChecked && full.payeeChecked);
+const plain = verifyClaim(claim, opts);
+assert("requestChecked and amountChecked are false when not supplied",
+  plain.ok && !plain.requestChecked && !plain.amountChecked);
+assert("a claim for another request is rejected",
+  failedAt(claim, { ...opts, expectedRequestHash: "ab".repeat(32) }) === "request");
+assert("an invoice for another amount is rejected",
+  failedAt(claim, { ...opts, expectedAmountMsat: "25001" }) === "amount");
+
+// ---------------------------------------------------------------------------
 // Signed-set negatives (published in the vector)
+
+console.log("\nkey registry");
+assert("registry parses", parseAttesterRegistry({ keys: [registryEntry(KID, x)] }).has(KID));
+const throws = (f: () => unknown) => { try { f(); return false; } catch { return true; } };
+assert("a repeated kid rejects the registry",
+  throws(() => parseAttesterRegistry({ keys: [registryEntry(KID, x), registryEntry(KID, x)] })));
+assert("an x that is not 32 bytes rejects the registry",
+  throws(() => parseAttesterRegistry({ keys: [registryEntry(KID, x.slice(0, 20))] })));
+assert("a non-Ed25519 key rejects the registry",
+  throws(() => parseAttesterRegistry({ keys: [{ ...registryEntry(KID, x), crv: "X25519" }] })));
+
+console.log("\nsigned-set negatives");
 //
 // The core is exactly CORE_FIELDS. These cases pin that membership, so an
 // implementation that drops, renames or adds a member inside the core is

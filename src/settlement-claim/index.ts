@@ -110,6 +110,28 @@ export function ed25519KeyFromSeed(seed: Uint8Array) {
   return { privateKey, x: jwk.x };
 }
 
+/**
+ * Parses an attester key registry (sar-keys.json shape) with the stricter
+ * rules of this profile: every `kid` appears at most once, and every `x`
+ * decodes to a 32-byte Ed25519 public key. sar-envelope's parser keeps the
+ * last entry for a repeated `kid`; here a repeat rejects the whole registry.
+ */
+export function parseAttesterRegistry(document: unknown): ReturnType<typeof parseKeyRegistry> {
+  const keys = (document as { keys?: unknown } | null)?.keys;
+  if (!Array.isArray(keys)) throw new Error("registry document must contain a 'keys' list");
+  const seen = new Set<string>();
+  for (const entry of keys as Array<Record<string, unknown>>) {
+    const kid = entry?.kid;
+    if (typeof kid !== "string" || kid.length === 0) throw new Error("every registry entry needs a non-empty kid");
+    if (seen.has(kid)) throw new Error(`kid ${JSON.stringify(kid)} appears more than once`);
+    seen.add(kid);
+    if (typeof entry.x !== "string" || Buffer.from(entry.x, "base64url").length !== 32) {
+      throw new Error(`key ${JSON.stringify(kid)}: x must decode to 32 bytes`);
+    }
+  }
+  return parseKeyRegistry(document);
+}
+
 /** Registry entry in the sar-keys.json shape. */
 export function registryEntry(kid: string, x: string) {
   return { kid, kty: "OKP", crv: "Ed25519", x };
@@ -148,7 +170,9 @@ export type ClaimCheck =
   | "payment_hash"
   | "request_hash"
   | "observed_at"
-  | "payee";
+  | "payee"
+  | "request"
+  | "amount";
 
 export type ClaimVerification =
   | {
@@ -163,6 +187,10 @@ export type ClaimVerification =
        * invoice, not that the payment went to whom the caller intended.
        */
       payeeChecked: boolean;
+      /** true only when `expectedRequestHash` was supplied and matched. */
+      requestChecked: boolean;
+      /** true only when `expectedAmountMsat` was supplied and matched. */
+      amountChecked: boolean;
       amountMsat: string | null;
       invoiceCreatedAt: number;
     }
@@ -177,6 +205,18 @@ export interface VerifyOptions {
    * invoice came from the intended recipient when compared to an expected one.
    */
   expectedPayee?: string;
+  /**
+   * The request binding digest the verifier computed from the request it is
+   * about to authorize (64 lowercase hex). Without it, request_hash is only
+   * known to match the invoice, not the caller's request.
+   */
+  expectedRequestHash?: string;
+  /**
+   * The amount the verifier expects, in millisatoshis (decimal string), e.g.
+   * PaymentRequirements.amount converted to msat. Compared with the invoice's
+   * nominal amount; an amountless invoice never matches.
+   */
+  expectedAmountMsat?: string;
 }
 
 function fail(failed: ClaimCheck, reason: string): ClaimVerification {
@@ -276,13 +316,25 @@ export function verifyClaim(claim: Record<string, unknown>, opts: VerifyOptions)
   if (opts.expectedPayee !== undefined && opts.expectedPayee.toLowerCase() !== payee.toLowerCase()) {
     return fail("payee", "invoice was not signed by the expected payee");
   }
+  if (opts.expectedRequestHash !== undefined && opts.expectedRequestHash !== core.request_hash) {
+    return fail("request", "request_hash is not the binding of the expected request");
+  }
+  const amountMsat = decoded.millisatoshis ?? null;
+  if (opts.expectedAmountMsat !== undefined && amountMsat !== opts.expectedAmountMsat) {
+    return fail(
+      "amount",
+      amountMsat === null ? "invoice has no amount" : "invoice amount does not match the expected amount",
+    );
+  }
 
   return {
     ok: true,
     claimId: expectedId,
     payee,
     payeeChecked: opts.expectedPayee !== undefined,
-    amountMsat: decoded.millisatoshis ?? null,
+    requestChecked: opts.expectedRequestHash !== undefined,
+    amountChecked: opts.expectedAmountMsat !== undefined,
+    amountMsat,
     invoiceCreatedAt: createdAt,
   };
 }
