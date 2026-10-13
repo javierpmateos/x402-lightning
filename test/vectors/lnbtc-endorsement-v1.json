@@ -1,0 +1,89 @@
+{
+  "description": "Attester endorsement vectors for the lnbtc settlement claim, as proposed on x402-foundation/x402#1195. The endorsement is an optional member of the attester's key registry entry; it does not change the claim or claim_id.",
+  "message_rule": "msg = UTF8(JCS({\"domain\": \"x402:lnbtc:attester-endorsement:v1\", \"node_id\": payee_endorsement.node_id, \"attester\": {kid, kty, crv, x} of the registry entry})). The verifier rebuilds msg from the entry; it never takes a message supplied alongside the signature.",
+  "signature_format": "ln-signmessage: zbase32(SigRec) where SigRec = (31 + recovery_id) || 64-byte compact secp256k1 signature over SHA256(SHA256(\"Lightning Signed Message:\" || msg)). Single-hash signatures are invalid. Signatures are RFC 6979 deterministic.",
+  "states": {
+    "ENDORSEMENT_VERIFIED": "the signature recovers node_id, and node_id equals the payee of the claim's payment_request",
+    "ENDORSEMENT_OTHER_NODE": "the signature recovers node_id, but node_id is not the payee; the verifier reports node_id with this state, and only with this state",
+    "ENDORSEMENT_NOT_PRESENT": "the registry entry has no payee_endorsement",
+    "ENDORSEMENT_INVALID": "payee_endorsement is present but does not verify; a fact about the registry entry, never reported as NOT_PRESENT"
+  },
+  "settlement_vector": "lnbtc-settlement-v1.json",
+  "invoice_payee": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+  "invoice_payee_source": "payee recovered from claim.payment_request in lnbtc-settlement-v1.json (secp256k1 private key 0x00..01)",
+  "cases": [
+    {
+      "name": "verified",
+      "node_privkey_hex": "0000000000000000000000000000000000000000000000000000000000000001",
+      "registry_entry": {
+        "kid": "lnbtc-settlement-ed25519-01",
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo",
+        "payee_endorsement": {
+          "format": "ln-signmessage",
+          "node_id": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+          "zbase": "dhjpbw1mnr46ethfek4y6b755kbb87g3eowpyy1r5jm8hqn9mt97h1adrzu7ei58yub3yi699bppzy1g3wpw5pmzzhuzqhtxfifqg5p6"
+        }
+      },
+      "message": "{\"attester\":{\"crv\":\"Ed25519\",\"kid\":\"lnbtc-settlement-ed25519-01\",\"kty\":\"OKP\",\"x\":\"11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo\"},\"domain\":\"x402:lnbtc:attester-endorsement:v1\",\"node_id\":\"0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798\"}",
+      "digest_hex": "3a68b6d07fe8fdb0892f6183f4b47eab328a8de351a4f2d0f6badafc7fff2da1",
+      "recovered_node_id": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "expect": {
+        "state": "ENDORSEMENT_VERIFIED"
+      }
+    },
+    {
+      "name": "other_node",
+      "node_privkey_hex": "0000000000000000000000000000000000000000000000000000000000000002",
+      "registry_entry": {
+        "kid": "lnbtc-settlement-ed25519-01",
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo",
+        "payee_endorsement": {
+          "format": "ln-signmessage",
+          "node_id": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+          "zbase": "dhtuzkqrjhcdsrkbuhpzqgnzkit6zs1rnaojim1f4ecrhjingnpge5if8k9yh344uwzc19onse93ju1txwdp3dackhuuq1f66xhxyp4e"
+        }
+      },
+      "message": "{\"attester\":{\"crv\":\"Ed25519\",\"kid\":\"lnbtc-settlement-ed25519-01\",\"kty\":\"OKP\",\"x\":\"11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo\"},\"domain\":\"x402:lnbtc:attester-endorsement:v1\",\"node_id\":\"02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5\"}",
+      "digest_hex": "3560b9537f7d15c05edf2af71e24330426ffeee5c3327395d829231ad0ff9724",
+      "recovered_node_id": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+      "expect": {
+        "state": "ENDORSEMENT_OTHER_NODE",
+        "node_id": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
+      }
+    },
+    {
+      "name": "not_present",
+      "registry_entry": {
+        "kid": "lnbtc-settlement-ed25519-01",
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"
+      },
+      "expect": {
+        "state": "ENDORSEMENT_NOT_PRESENT"
+      }
+    },
+    {
+      "name": "invalid_node_id_swapped",
+      "description": "The verified case's signature with node_id replaced by the 0x00..02 node. The verifier rebuilds msg with the claimed node_id, so the signature recovers a key that is not node_id.",
+      "registry_entry": {
+        "kid": "lnbtc-settlement-ed25519-01",
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo",
+        "payee_endorsement": {
+          "format": "ln-signmessage",
+          "node_id": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+          "zbase": "dhjpbw1mnr46ethfek4y6b755kbb87g3eowpyy1r5jm8hqn9mt97h1adrzu7ei58yub3yi699bppzy1g3wpw5pmzzhuzqhtxfifqg5p6"
+        }
+      },
+      "expect": {
+        "state": "ENDORSEMENT_INVALID"
+      }
+    }
+  ]
+}
