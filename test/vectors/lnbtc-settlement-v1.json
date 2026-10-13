@@ -14,6 +14,18 @@
       }
     ]
   },
+  "core_fields": [
+    "claim_version",
+    "network",
+    "payment_hash",
+    "payment_request",
+    "request_hash",
+    "request_binding_profile",
+    "observed_at",
+    "redemption",
+    "attester_kid"
+  ],
+  "core_rule": "The signed core is exactly the members listed in core_fields, all non-empty strings, and no others. claim_id, sig_alg, sig and any other member of the claim are outside it. Member order is not a separate rule: JCS (RFC 8785) sorts members, so canonical_core is the JCS serialization of exactly these members.",
   "core": {
     "claim_version": "lnbtc.settlement.v1",
     "network": "lnbtc:000000000019d6689c085ae165831e93",
@@ -40,5 +52,81 @@
     "claim_id": "sha256:955ceb45504f3bbc61a85c035b13cca79337204c2779700d76da139cb1a71918",
     "sig_alg": "Ed25519",
     "sig": "base64url:em1Q_uKEV8PfQRXbW_OWXwbQbBc5IzAKYGHNFy-93ixyjt5t2AfBRVxMcgl5wN7ZH5iFoMEhkNoSOfJr_WLsBg"
-  }
+  },
+  "negatives": [
+    {
+      "name": "claim_version_v2",
+      "description": "claim_version changed to lnbtc.settlement.v2, claim_id recomputed over the mutated core, original sig kept. MUST be rejected: unsupported version, and the signature does not cover the mutated digest.",
+      "digest_hex": "06848562e09cfd5c4292f6a094ff63b007ede04775c137a4269b061f5a509d96",
+      "claim": {
+        "claim_version": "lnbtc.settlement.v2",
+        "network": "lnbtc:000000000019d6689c085ae165831e93",
+        "payment_hash": "a923c2c0e4fe77061ff1cb882171f6fdf926719bb7f5ffe2e05458438c52825e",
+        "payment_request": "lnbc250n1pj48ugqpp54y3u9s8ylemsv8l3ewyzzu0klhujvuvmkl6llchq23vy8rzjsf0qsp5zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zygshp5p4nz8am4uqj4q8a87z3sk4x6yk4dv2mvel34epw68qqkwy0xcqvqxqzfvcqpjr4rx6ls6j5rpwknuea64evlk7yfx56wmqcer5eerekdsn9tlv6v4ex9mlz5dtm9qapl3svwlqcf7837dmjkru9z9w4h2rvm0md52w2sqxrwu5f",
+        "request_hash": "0d6623f775e025501fa7f0a30b54da25aad62b6ccfe35c85da38016711e6c018",
+        "request_binding_profile": "http:1",
+        "observed_at": "2023-11-14T22:13:25Z",
+        "redemption": "verified-and-consumed",
+        "attester_kid": "lnbtc-settlement-ed25519-01",
+        "claim_id": "sha256:06848562e09cfd5c4292f6a094ff63b007ede04775c137a4269b061f5a509d96",
+        "sig_alg": "Ed25519",
+        "sig": "base64url:em1Q_uKEV8PfQRXbW_OWXwbQbBc5IzAKYGHNFy-93ixyjt5t2AfBRVxMcgl5wN7ZH5iFoMEhkNoSOfJr_WLsBg"
+      },
+      "expect": "reject"
+    },
+    {
+      "name": "claim_version_v0",
+      "description": "As claim_version_v2, with lnbtc.settlement.v0.",
+      "digest_hex": "6267046f51fa69b8ac6a118e96c655edc61e4c15be9471b37af14f0f4b312003",
+      "claim": {
+        "claim_version": "lnbtc.settlement.v0",
+        "network": "lnbtc:000000000019d6689c085ae165831e93",
+        "payment_hash": "a923c2c0e4fe77061ff1cb882171f6fdf926719bb7f5ffe2e05458438c52825e",
+        "payment_request": "lnbc250n1pj48ugqpp54y3u9s8ylemsv8l3ewyzzu0klhujvuvmkl6llchq23vy8rzjsf0qsp5zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zygshp5p4nz8am4uqj4q8a87z3sk4x6yk4dv2mvel34epw68qqkwy0xcqvqxqzfvcqpjr4rx6ls6j5rpwknuea64evlk7yfx56wmqcer5eerekdsn9tlv6v4ex9mlz5dtm9qapl3svwlqcf7837dmjkru9z9w4h2rvm0md52w2sqxrwu5f",
+        "request_hash": "0d6623f775e025501fa7f0a30b54da25aad62b6ccfe35c85da38016711e6c018",
+        "request_binding_profile": "http:1",
+        "observed_at": "2023-11-14T22:13:25Z",
+        "redemption": "verified-and-consumed",
+        "attester_kid": "lnbtc-settlement-ed25519-01",
+        "claim_id": "sha256:6267046f51fa69b8ac6a118e96c655edc61e4c15be9471b37af14f0f4b312003",
+        "sig_alg": "Ed25519",
+        "sig": "base64url:em1Q_uKEV8PfQRXbW_OWXwbQbBc5IzAKYGHNFy-93ixyjt5t2AfBRVxMcgl5wN7ZH5iFoMEhkNoSOfJr_WLsBg"
+      },
+      "expect": "reject"
+    },
+    {
+      "name": "core_without_claim_version",
+      "description": "JCS over the core with claim_version removed. An implementation that drops claim_version from the signed set computes this digest, which differs from digest_hex, so the signature does not verify.",
+      "canonical_core": "{\"attester_kid\":\"lnbtc-settlement-ed25519-01\",\"network\":\"lnbtc:000000000019d6689c085ae165831e93\",\"observed_at\":\"2023-11-14T22:13:25Z\",\"payment_hash\":\"a923c2c0e4fe77061ff1cb882171f6fdf926719bb7f5ffe2e05458438c52825e\",\"payment_request\":\"lnbc250n1pj48ugqpp54y3u9s8ylemsv8l3ewyzzu0klhujvuvmkl6llchq23vy8rzjsf0qsp5zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zygshp5p4nz8am4uqj4q8a87z3sk4x6yk4dv2mvel34epw68qqkwy0xcqvqxqzfvcqpjr4rx6ls6j5rpwknuea64evlk7yfx56wmqcer5eerekdsn9tlv6v4ex9mlz5dtm9qapl3svwlqcf7837dmjkru9z9w4h2rvm0md52w2sqxrwu5f\",\"redemption\":\"verified-and-consumed\",\"request_binding_profile\":\"http:1\",\"request_hash\":\"0d6623f775e025501fa7f0a30b54da25aad62b6ccfe35c85da38016711e6c018\"}",
+      "digest_hex": "1d1ecf25276d909c38b34096cac2a187eb8c8f1ac6fe21fafe664af1a03a029c",
+      "expect": "digest_mismatch"
+    },
+    {
+      "name": "extension_member_outside_core",
+      "description": "The valid claim with an extra member added. The member is outside the core: the claim MUST still verify, with the same claim_id.",
+      "claim": {
+        "claim_version": "lnbtc.settlement.v1",
+        "network": "lnbtc:000000000019d6689c085ae165831e93",
+        "payment_hash": "a923c2c0e4fe77061ff1cb882171f6fdf926719bb7f5ffe2e05458438c52825e",
+        "payment_request": "lnbc250n1pj48ugqpp54y3u9s8ylemsv8l3ewyzzu0klhujvuvmkl6llchq23vy8rzjsf0qsp5zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zygshp5p4nz8am4uqj4q8a87z3sk4x6yk4dv2mvel34epw68qqkwy0xcqvqxqzfvcqpjr4rx6ls6j5rpwknuea64evlk7yfx56wmqcer5eerekdsn9tlv6v4ex9mlz5dtm9qapl3svwlqcf7837dmjkru9z9w4h2rvm0md52w2sqxrwu5f",
+        "request_hash": "0d6623f775e025501fa7f0a30b54da25aad62b6ccfe35c85da38016711e6c018",
+        "request_binding_profile": "http:1",
+        "observed_at": "2023-11-14T22:13:25Z",
+        "redemption": "verified-and-consumed",
+        "attester_kid": "lnbtc-settlement-ed25519-01",
+        "claim_id": "sha256:955ceb45504f3bbc61a85c035b13cca79337204c2779700d76da139cb1a71918",
+        "sig_alg": "Ed25519",
+        "sig": "base64url:em1Q_uKEV8PfQRXbW_OWXwbQbBc5IzAKYGHNFy-93ixyjt5t2AfBRVxMcgl5wN7ZH5iFoMEhkNoSOfJr_WLsBg",
+        "x_example_extension": "not part of the core"
+      },
+      "expect": "accept"
+    },
+    {
+      "name": "extension_member_inside_core",
+      "description": "JCS over the core with that extra member pulled into it. An implementation that signs or verifies over every member of the claim computes this digest, which differs from digest_hex.",
+      "canonical_core": "{\"attester_kid\":\"lnbtc-settlement-ed25519-01\",\"claim_version\":\"lnbtc.settlement.v1\",\"network\":\"lnbtc:000000000019d6689c085ae165831e93\",\"observed_at\":\"2023-11-14T22:13:25Z\",\"payment_hash\":\"a923c2c0e4fe77061ff1cb882171f6fdf926719bb7f5ffe2e05458438c52825e\",\"payment_request\":\"lnbc250n1pj48ugqpp54y3u9s8ylemsv8l3ewyzzu0klhujvuvmkl6llchq23vy8rzjsf0qsp5zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zygshp5p4nz8am4uqj4q8a87z3sk4x6yk4dv2mvel34epw68qqkwy0xcqvqxqzfvcqpjr4rx6ls6j5rpwknuea64evlk7yfx56wmqcer5eerekdsn9tlv6v4ex9mlz5dtm9qapl3svwlqcf7837dmjkru9z9w4h2rvm0md52w2sqxrwu5f\",\"redemption\":\"verified-and-consumed\",\"request_binding_profile\":\"http:1\",\"request_hash\":\"0d6623f775e025501fa7f0a30b54da25aad62b6ccfe35c85da38016711e6c018\",\"x_example_extension\":\"not part of the core\"}",
+      "digest_hex": "9ab39743ecf93d6028dd8d0475b1d47e74bae352c5eb4cefe1fd20fc4473fecf",
+      "expect": "digest_mismatch"
+    }
+  ]
 }

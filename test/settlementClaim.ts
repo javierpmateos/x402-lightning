@@ -176,16 +176,110 @@ assert("invoice without a description hash is rejected",
   failedAt(signedWith({ network: TESTNET, payment_request: noDescHash, payment_hash: "33".repeat(32) }), { registry }) === "request_hash");
 
 // ---------------------------------------------------------------------------
+// Signed-set negatives (published in the vector)
+//
+// The core is exactly CORE_FIELDS. These cases pin that membership, so an
+// implementation that drops, renames or adds a member inside the core is
+// caught by the vector itself, not only by reading the spec text.
+
+/**
+ * JCS bytes and digest of an arbitrary object, for cores that are not valid
+ * ClaimCores (missing or extra members).
+ */
+function digestOf(obj: Record<string, string>) {
+  const bytes = canonicalCoreBytes(obj as ClaimCore);
+  return { canonical: Buffer.from(bytes).toString("utf8"), digest_hex: coreDigest(obj as ClaimCore).toString("hex") };
+}
+
+const validDigest = coreDigest(core).toString("hex");
+
+// 1. claim_version mutated, claim_id recomputed, original signature kept.
+const versionMutated = (version: string) => {
+  const mutatedCore = { ...core, claim_version: version };
+  const mutated = { ...claim, claim_version: version, claim_id: claimId(mutatedCore) };
+  return { core: mutatedCore, claim: mutated };
+};
+const v2 = versionMutated("lnbtc.settlement.v2");
+const v0 = versionMutated("lnbtc.settlement.v0");
+assert("claim_version v2: digest differs from the valid core", coreDigest(v2.core).toString("hex") !== validDigest);
+assert("claim_version v0: digest differs from the valid core", coreDigest(v0.core).toString("hex") !== validDigest);
+assert("claim_version v2 is rejected", verifyClaim(v2.claim, opts).ok === false);
+assert("claim_version v0 is rejected", verifyClaim(v0.claim, opts).ok === false);
+
+// 2. A verifier that drops claim_version from the signed set computes a different digest.
+const { claim_version: _dropped, ...withoutVersion } = core;
+const dropped = digestOf(withoutVersion);
+assert("core without claim_version: digest differs", dropped.digest_hex !== validDigest);
+
+// 3. A member outside the core is not signed: adding one to the claim changes nothing,
+//    while a verifier that pulls it into the signed set computes a different digest.
+const EXTENSION = { x_example_extension: "not part of the core" };
+const withExtension = { ...claim, ...EXTENSION };
+assert("extension member outside the core: claim still verifies, same claim_id",
+  verifyClaim(withExtension, opts).ok === true && withExtension.claim_id === claim.claim_id);
+const absorbed = digestOf({ ...core, ...EXTENSION });
+assert("extension member pulled into the core: digest differs", absorbed.digest_hex !== validDigest);
+
+// ---------------------------------------------------------------------------
 // Print the vector for #1195
 
 if (process.argv.includes("--vector")) {
   const vec = {
     signing_key: { seed_hex: SEED.toString("hex"), source: "RFC 8032 §7.1 TEST 1", public_key_x: x },
     key_registry: { keys: [registryEntry(KID, x)] },
+    core_fields: [...CORE_FIELDS],
+    core_rule:
+      "The signed core is exactly the members listed in core_fields, all non-empty strings, and no others. " +
+      "claim_id, sig_alg, sig and any other member of the claim are outside it. Member order is not a separate " +
+      "rule: JCS (RFC 8785) sorts members, so canonical_core is the JCS serialization of exactly these members.",
     core,
     canonical_core: Buffer.from(canonicalCoreBytes(core)).toString("utf8"),
-    digest_hex: coreDigest(core).toString("hex"),
+    digest_hex: validDigest,
     claim: claim as SettlementClaim,
+    negatives: [
+      {
+        name: "claim_version_v2",
+        description:
+          "claim_version changed to lnbtc.settlement.v2, claim_id recomputed over the mutated core, original sig kept. " +
+          "MUST be rejected: unsupported version, and the signature does not cover the mutated digest.",
+        digest_hex: coreDigest(v2.core).toString("hex"),
+        claim: v2.claim,
+        expect: "reject",
+      },
+      {
+        name: "claim_version_v0",
+        description: "As claim_version_v2, with lnbtc.settlement.v0.",
+        digest_hex: coreDigest(v0.core).toString("hex"),
+        claim: v0.claim,
+        expect: "reject",
+      },
+      {
+        name: "core_without_claim_version",
+        description:
+          "JCS over the core with claim_version removed. An implementation that drops claim_version from the " +
+          "signed set computes this digest, which differs from digest_hex, so the signature does not verify.",
+        canonical_core: dropped.canonical,
+        digest_hex: dropped.digest_hex,
+        expect: "digest_mismatch",
+      },
+      {
+        name: "extension_member_outside_core",
+        description:
+          "The valid claim with an extra member added. The member is outside the core: the claim MUST still " +
+          "verify, with the same claim_id.",
+        claim: withExtension,
+        expect: "accept",
+      },
+      {
+        name: "extension_member_inside_core",
+        description:
+          "JCS over the core with that extra member pulled into it. An implementation that signs or verifies " +
+          "over every member of the claim computes this digest, which differs from digest_hex.",
+        canonical_core: absorbed.canonical,
+        digest_hex: absorbed.digest_hex,
+        expect: "digest_mismatch",
+      },
+    ],
   };
   console.log("\n" + JSON.stringify(vec, null, 2));
 }
